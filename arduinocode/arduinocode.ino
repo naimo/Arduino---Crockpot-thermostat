@@ -6,7 +6,6 @@ LiquidCrystal lcd(12, 11, 1, 2, 3, 4);
 
 // general variables
 int potPin = A2;
-int val = 0;
 int thermPin = A1;
 int pushPin = 10;
 int relayPin = 6;
@@ -241,8 +240,7 @@ void classicthermostat(){
 }
 
 double acquiresettemp(){
-  val = analogRead(potPin);
-  return map(val, 0, 1023, 99, 15); 
+  return map(analogRead(potPin), 0, 1023, 99, 15); 
 }
   
 double measuretemp(){
