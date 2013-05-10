@@ -1,41 +1,34 @@
 #include <LiquidCrystal.h>
-#include <PID_v1.h>
-#define relayPin 6
 #define NUMSAMPLES 5
-
-double PIDSetpoint, realtemp, Output;
-PID myPID(&realtemp, &Output, &PIDSetpoint,2,5,1, DIRECT);
-int WindowSize = 5000;
-unsigned long windowStartTime;
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(12, 11, 1, 2, 3, 4);
 
+// general variables
 int potPin = A2;
-int val = 0;
 int thermPin = A1;
-int pushPin=10;
+int pushPin = 10;
+int relayPin = 6;
+double Temperature;
 
-double classicSetPoint = 15;
-int classicDwellTime = 0;
-long classicStartTime = 0;
-double tempSetPoint = 15;
-double tempDwellTime = 0;
-boolean changeValue = false;
+// classic thermostat menu/mode variables
+double ClassicSetPoint=15;
+double TempClassicSetPoint = 15;
 
+// menu setup
 int menu = 0;
 int submenu = 0;
-int mode = 1;
-int buttonState;  
+boolean newdisplay = true;                         // if display has been cleared, next menu/mode will refresh
+int buttonState;
 int lastButtonState = LOW;
 long lastButtonTime = 0;
 long longPressTime = 500;
-long lastDebounceTime = 0;
-long debounceDelay = 50;  
-boolean newdisplay = true;                         // test if display has been cleared
 boolean shortButtonPressed = false;
 boolean longButtonPressed = false;
+boolean changeValue = false;
+int mode = 1;
 
+// thermistor setup
 int nominalR = 10000;
 int nominalT = 25;
 int numsamp = NUMSAMPLES;
@@ -44,11 +37,6 @@ int seriesR = 10000;
 int samples[NUMSAMPLES];
 
 void setup() {
-  windowStartTime = millis();
-  PIDSetpoint = 100;
-  myPID.SetOutputLimits(0, WindowSize);
-  myPID.SetMode(AUTOMATIC);
-  
   lcd.begin(16, 2);
   pinMode(relayPin, OUTPUT);
   pinMode(pushPin, INPUT);
@@ -61,9 +49,6 @@ void loop() {
     case 1:
       classicthermostat();
       break;
-    case 2:
-      PIDthermostat();
-      break;    
   }
   delay(50);
 }
@@ -85,15 +70,16 @@ void startmenu(){
   switch (menu) {
     case 0:
       if (shortButtonPressed){
-          lcd.clear();
           menu++;
           shortButtonPressed = false;
+          lcd.clear();
           newdisplay = true;
       }
       if (longButtonPressed){
         longButtonPressed = false;
         menu=mode;
         submenu=1;
+        lcd.clear();
         newdisplay = true;
       }      
       break;
@@ -127,12 +113,12 @@ void startmenu(){
               lcd.setCursor(0, 1);
               lcd.print("Setpoint");
               lcd.setCursor(11, 1);
-              lcd.print(int(tempSetPoint));              
+              lcd.print(int(TempClassicSetPoint));              
             }
             if (changeValue){
               lcd.setCursor(11, 1);
-              tempSetPoint=acquiresettemp();
-              lcd.print(int(tempSetPoint));
+              TempClassicSetPoint=acquiresettemp();
+              lcd.print(int(TempClassicSetPoint));
             }            
             if (shortButtonPressed){
               shortButtonPressed = false;
@@ -146,24 +132,6 @@ void startmenu(){
               changeValue=!changeValue;
             }
             break;
-//          case 2:
-//            if (newdisplay){
-//              newdisplay = false;
-//              lcd.setCursor(0, 0);
-//              lcd.print("Thermostat");
-//              lcd.setCursor(0, 1);
-//              lcd.print("Time (min)");
-//            }
-//            lcd.setCursor(11, 1);
-//            lcd.print(acquiremin());
-//            if (shortButtonPressed){
-//              shortButtonPressed = false;
-//              lcd.clear();
-//              submenu++;
-//              tempDwellTime=acquiremin();
-//              newdisplay = true;
-//            }
-//            break;
           case 2:
             if (newdisplay){
               newdisplay = false;
@@ -185,8 +153,7 @@ void startmenu(){
               mode=1;  
               lcd.clear();
               newdisplay = true;
-              classicSetPoint=tempSetPoint;
-//              classicDwellTime=tempDwellTime;      
+              ClassicSetPoint=TempClassicSetPoint;
             }
           case 3:
             if (newdisplay){
@@ -222,7 +189,7 @@ void startmenu(){
       if (newdisplay){
         newdisplay = false;
         lcd.setCursor(0, 0);
-        lcd.print("PID Thermostat");
+        lcd.print("Dummy Menu");
       }
       if (shortButtonPressed){
           shortButtonPressed = false;
@@ -232,10 +199,6 @@ void startmenu(){
       }
       if (longButtonPressed){
         longButtonPressed = false;
-        mode=2;
-        menu=0;
-        lcd.clear();       
-        newdisplay = true;
       }
       break;      
     
@@ -246,44 +209,10 @@ void startmenu(){
   }
 }
 
-  
-void PIDthermostat(){
-  PIDSetpoint = acquiresettemp();
-  realtemp = measuretemp();
-  myPID.Compute();
-  unsigned long now = millis();
-  if(now - windowStartTime>WindowSize)
-  { //time to shift the Relay Window
-    windowStartTime += WindowSize;
-  }
-  if(Output > now - windowStartTime){
-    digitalWrite(relayPin,HIGH);
-    lcd.setCursor(15, 1);
-    lcd.print("#");    
-  }else{
-    digitalWrite(relayPin,LOW);
-    lcd.setCursor(15, 0);
-    lcd.print(" ");     
-  }
-  if (menu == 0) {
-    if (newdisplay){
-      newdisplay = false;
-      lcd.setCursor(0, 0);
-      lcd.print("Set:");
-      lcd.setCursor(0, 1);
-      lcd.print("Real:");
-    }
-    lcd.setCursor(6, 1);
-    lcd.print(int(realtemp));
-    lcd.setCursor(5, 0);
-    lcd.print(int(PIDSetpoint));
-  }  
-}
 
 void classicthermostat(){
-//  classicSetPoint = acquiresettemp();
-  realtemp = measuretemp();
-    if (realtemp < classicSetPoint)
+  Temperature = measuretemp();
+    if (Temperature < ClassicSetPoint)
     {
       digitalWrite(relayPin, HIGH);
       lcd.setCursor(15, 1);
@@ -304,25 +233,14 @@ void classicthermostat(){
       lcd.print("Real:");
     }
     lcd.setCursor(6, 1);
-    lcd.print(int(realtemp));
+    lcd.print(int(Temperature));
     lcd.setCursor(5, 0);
-    lcd.print(int(classicSetPoint));
+    lcd.print(int(ClassicSetPoint));
   }
 }
 
 double acquiresettemp(){
-  val = analogRead(potPin);
-  return map(val, 0, 1023, 99, 15); 
-}
-
-int acquirehour(){
-  val = analogRead(potPin);
-  return map(val, 0, 1023, 24, 0); 
-}
-
-int acquiremin(){
-  val = analogRead(potPin);
-  return map(val, 0, 1023, 59, 0); 
+  return map(analogRead(potPin), 0, 1023, 99, 15); 
 }
   
 double measuretemp(){
