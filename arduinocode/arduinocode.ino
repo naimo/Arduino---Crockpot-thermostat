@@ -16,10 +16,10 @@ double ClassicSetPoint=15;
 double TempClassicSetPoint = 15;
 
 // yogurt variables
-double SanitizeTemp = 185;
-double StarterHoldTemp = 110;
-double IncubTemp = 100;
-double IncubDuration = 10*3600;
+double SanitizeTemp = 32;
+double StarterHoldTemp = 26;
+double IncubTemp = 25;
+double IncubDuration = 30;
 double IncubStartTime;
 int YogStep = 1;
 
@@ -52,23 +52,24 @@ void setup() {
 
 void loop() {
   button(); 
-  
+
   switch (mode) {
-    case 1:
-      classicthermostat();
-      break;
-    case 2:
-      yogurt();
-      break;
+  case 1:
+    classicthermostat();
+    break;
+  case 2:
+    yogurt();
+    break;
   }
 
   startmenu();
-  if (digitalRead(relayPIN)==HIGH){
-      lcd.setCursor(15, 1);
-      lcd.print("#");      
-  }else{
-      lcd.setCursor(15, 1);
-      lcd.print(" ");      
+  if (digitalRead(relayPin)==HIGH){
+    lcd.setCursor(15, 1);
+    lcd.print("#");      
+  }
+  else{
+    lcd.setCursor(15, 1);
+    lcd.print(" ");      
   }
   delay(50);
 }
@@ -79,7 +80,8 @@ void button(){
     if (buttonState == LOW) {
       if (millis()-lastButtonTime < longPressTime){
         shortButtonPressed = true;
-      }else{
+      }
+      else{
         longButtonPressed = true;
       }
     } 
@@ -90,214 +92,216 @@ void button(){
 
 void startmenu(){
   switch (menu) {
-    case 0:
+  case 0:
+    if (shortButtonPressed){
+      menu++;
+      shortButtonPressed = false;
+      lcd.clear();
+      newdisplay = true;
+    }
+    if (longButtonPressed){
+      longButtonPressed = false;
+      menu=mode;
+      submenu=1;
+      lcd.clear();
+      newdisplay = true;
+    }      
+    break;
+
+
+  case 1:
+    if (submenu == 0){
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Thermostat");
+      }
       if (shortButtonPressed){
-          menu++;
-          shortButtonPressed = false;
-          lcd.clear();
-          newdisplay = true;
+        shortButtonPressed = false;
+        lcd.clear();
+        menu++;
+        newdisplay = true;
       }
       if (longButtonPressed){
-        longButtonPressed = false;
-        menu=mode;
-        submenu=1;
+        longButtonPressed = false;        
+        submenu=1;    
         lcd.clear();
         newdisplay = true;
-      }      
-      break;
-    
-    
-    case 1:
-      if (submenu == 0){
+      }
+    }
+    else{
+      switch (submenu) {
+      case 1:
         if (newdisplay){
           newdisplay = false;
           lcd.setCursor(0, 0);
           lcd.print("Thermostat");
+          lcd.setCursor(0, 1);
+          lcd.print("Setpoint");
+          lcd.setCursor(11, 1);
+          lcd.print(int(TempClassicSetPoint));              
         }
+        if (changeValue){
+          lcd.setCursor(11, 1);
+          TempClassicSetPoint=acquiresettemp();
+          lcd.print(int(TempClassicSetPoint));
+        }            
         if (shortButtonPressed){
           shortButtonPressed = false;
           lcd.clear();
-          menu++;
+          submenu++;
+          newdisplay = true;
+          changeValue = false;
+        }
+        if (longButtonPressed){
+          longButtonPressed = false;
+          changeValue=!changeValue;
+        }
+        break;
+      case 2:
+        if (newdisplay){
+          newdisplay = false;
+          lcd.setCursor(0, 0);
+          lcd.print("Thermostat");
+          lcd.setCursor(0, 1);
+          lcd.print("Accept");
+        }                      
+        if (shortButtonPressed){
+          shortButtonPressed = false;
+          submenu++;
+          lcd.clear();
           newdisplay = true;
         }
         if (longButtonPressed){
           longButtonPressed = false;        
-          submenu=1;    
+          menu=0;
+          submenu=0;  
+          mode=1;  
+          ClassicSetPoint=TempClassicSetPoint;              
           lcd.clear();
           newdisplay = true;
         }
-      }else{
-        switch (submenu) {
-          case 1:
-            if (newdisplay){
-              newdisplay = false;
-              lcd.setCursor(0, 0);
-              lcd.print("Thermostat");
-              lcd.setCursor(0, 1);
-              lcd.print("Setpoint");
-              lcd.setCursor(11, 1);
-              lcd.print(int(TempClassicSetPoint));              
-            }
-            if (changeValue){
-              lcd.setCursor(11, 1);
-              TempClassicSetPoint=acquiresettemp();
-              lcd.print(int(TempClassicSetPoint));
-            }            
-            if (shortButtonPressed){
-              shortButtonPressed = false;
-              lcd.clear();
-              submenu++;
-              newdisplay = true;
-              changeValue = false;
-           }
-            if (longButtonPressed){
-              longButtonPressed = false;
-              changeValue=!changeValue;
-            }
-            break;
-          case 2:
-            if (newdisplay){
-              newdisplay = false;
-              lcd.setCursor(0, 0);
-              lcd.print("Thermostat");
-              lcd.setCursor(0, 1);
-              lcd.print("Accept");
-            }                      
-            if (shortButtonPressed){
-              shortButtonPressed = false;
-              lcd.clear();
-              submenu++;
-              newdisplay = true;
-            }
-            if (longButtonPressed){
-              longButtonPressed = false;        
-              menu=0;
-              submenu=0;  
-              mode=1;  
-              lcd.clear();
-              newdisplay = true;
-              ClassicSetPoint=TempClassicSetPoint;
-            }
-          case 3:
-            if (newdisplay){
-              newdisplay = false;
-              lcd.setCursor(0, 0);
-              lcd.print("Thermostat");
-              lcd.setCursor(0, 1);
-              lcd.print("Leave menu");
-            }
-            if (shortButtonPressed){
-              shortButtonPressed = false;
-              lcd.clear();
-              submenu++;
-              newdisplay = true;
-            }
-            if (longButtonPressed){
-              longButtonPressed = false;        
-              menu=0;
-              submenu=0;    
-              lcd.clear();
-              newdisplay = true;
-            }             
-            break;
-          default: 
-            submenu=1;
-            break;
+      case 3:
+        if (newdisplay){
+          newdisplay = false;
+          lcd.setCursor(0, 0);
+          lcd.print("Thermostat");
+          lcd.setCursor(0, 1);
+          lcd.print("Leave menu");
         }
-      }                
-      break;
-    
-    
-    case 2:
-      if (submenu == 0){
+        if (shortButtonPressed){
+          shortButtonPressed = false;
+          submenu++;
+          lcd.clear();
+          newdisplay = true;
+        }
+        if (longButtonPressed){
+          longButtonPressed = false;        
+          menu=0;
+          submenu=0;    
+          lcd.clear();
+          newdisplay = true;
+        }             
+        break;
+      default: 
+        submenu=1;
+        break;
+      }
+    }                
+    break;
+
+
+  case 2:
+    if (submenu == 0){
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Yogurt");
+      }
+      if (shortButtonPressed){
+        shortButtonPressed = false;
+        menu++;
+        lcd.clear();
+        newdisplay = true;
+      }
+      if (longButtonPressed){
+        longButtonPressed = false;        
+        submenu=1;
+        lcd.clear();    
+        newdisplay = true;
+      }
+    }
+    else{
+      switch (submenu) {
+      case 1:
         if (newdisplay){
           newdisplay = false;
           lcd.setCursor(0, 0);
           lcd.print("Yogurt");
-        }
+          lcd.setCursor(0, 1);
+          lcd.print("(re)Start");
+        }                      
         if (shortButtonPressed){
           shortButtonPressed = false;
+          submenu++;
           lcd.clear();
-          menu++;
           newdisplay = true;
         }
         if (longButtonPressed){
           longButtonPressed = false;        
-          submenu=1;
-          lcd.clear();    
+          menu=0;
+          submenu=0;  
+          mode=2;
+          YogStep=1;  
+          digitalWrite(relayPin, HIGH);
+          lcd.clear();
           newdisplay = true;
         }
-      }else{
-        switch (submenu) {
-          case 1:
-            if (newdisplay){
-              newdisplay = false;
-              lcd.setCursor(0, 0);
-              lcd.print("Yogurt");
-              lcd.setCursor(0, 1);
-              lcd.print("(re)Start");
-            }                      
-            if (shortButtonPressed){
-              shortButtonPressed = false;
-              lcd.clear();
-              submenu++;
-              newdisplay = true;
-            }
-            if (longButtonPressed){
-              longButtonPressed = false;        
-              menu=0;
-              submenu=0;  
-              mode=2;
-              YogStep=1;  
-              lcd.clear();
-              newdisplay = true;
-              digitalWrite(relayPin, HIGH);
-            }
-          case 2:
-            if (newdisplay){
-              newdisplay = false;
-              lcd.setCursor(0, 0);
-              lcd.print("Yogurt");
-              lcd.setCursor(0, 1);
-              lcd.print("Leave menu");
-            }
-            if (shortButtonPressed){
-              shortButtonPressed = false;
-              lcd.clear();
-              submenu++;
-              newdisplay = true;
-            }
-            if (longButtonPressed){
-              longButtonPressed = false;        
-              menu=0;
-              submenu=0;    
-              lcd.clear();
-              newdisplay = true;
-            }             
-            break;
-          default: 
-            submenu=1;
-            break;
+      case 2:
+        if (newdisplay){
+          newdisplay = false;
+          lcd.setCursor(0, 0);
+          lcd.print("Yogurt");
+          lcd.setCursor(0, 1);
+          lcd.print("Leave menu");
         }
-      }                
-      break;      
-   
-    default: 
-      menu=1;
-      break;
+        if (shortButtonPressed){
+          shortButtonPressed = false;
+          submenu++;
+          lcd.clear();
+          newdisplay = true;
+        }
+        if (longButtonPressed){
+          longButtonPressed = false;        
+          menu=0;
+          submenu=0;    
+          lcd.clear();
+          newdisplay = true;
+        }             
+        break;
+      default: 
+        submenu=1;
+        break;
+      }
+    }                
+    break;      
+
+  default: 
+    menu=1;
+    break;
   }
 }
 
 void thermostat(){
-    Temperature = measuretemp();
-    if (Temperature < ClassicSetPoint)
-    {
-      digitalWrite(relayPin, HIGH);
-    }
+  Temperature = measuretemp();
+  if (Temperature < ClassicSetPoint)
+  {
+    digitalWrite(relayPin, HIGH);
+  }
   else
-    {
-      digitalWrite(relayPin, LOW); 
-    }
+  {
+    digitalWrite(relayPin, LOW); 
+  }
 }
 
 void classicthermostat(){
@@ -319,65 +323,63 @@ void classicthermostat(){
 
 void yogurt(){
   switch(YogStep){
-    case 1:
-      if (menu == 0) {
-        if (newdisplay){
-          newdisplay = false;
-          lcd.setCursor(0, 0);
-          lcd.print("Heat to:");
-          lcd.setCursor(0, 1);
-          lcd.print("Temp:");
-        }
-        lcd.setCursor(6, 1);
-        lcd.print(int(Temperature));
-        lcd.setCursor(9, 0);
-        lcd.print(int(ClassicSetPoint));
+  case 1:
+    if (menu == 0) {
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Heat to");
+        lcd.setCursor(0, 1);
+        lcd.print("Temp");
       }
-      Temperature = measuretemp();
-      if (Temperature >= SanitizeTemp){
-        YogStep++;
-        lcd.clear();
-        newdisplay = true;
-        digitalWrite(relayPin, LOW); 
-      }
-      break;
-      
-    case 2:
-      if (menu == 0) {
-        if (newdisplay){
-          newdisplay = false;
-          lcd.setCursor(0, 0);
-          lcd.print("Cool to:");
-          lcd.setCursor(0, 1);
-          lcd.print("Temp:");
-        }
-        lcd.setCursor(6, 1);
-        lcd.print(int(Temperature));
-        lcd.setCursor(9, 0);
-        lcd.print(int(StarterHoldTemp));
-      }
-      Temperature = measuretemp();
-      if (Temperature <= StarterHoldTemp){
-        YogStep++;
-        lcd.clear();
-        ClassicSetPoint = StarterHoldTemp;
-        newdisplay = true;
-      }
-      break;
+      lcd.setCursor(6, 1);
+      lcd.print(int(Temperature));
+      lcd.setCursor(9, 0);
+      lcd.print(int(SanitizeTemp));
+    }
+    Temperature = measuretemp();
+    if (Temperature >= SanitizeTemp){
+      YogStep++;
+      lcd.clear();
+      newdisplay = true;
+      digitalWrite(relayPin, LOW); 
+    }
+    break;
 
-    case 3:
-      if (menu == 0) {
-        if (newdisplay){
-          newdisplay = false;
-          lcd.setCursor(0, 0);
-          lcd.print("Add starter (press)");
-          lcd.setCursor(0, 1);
-          lcd.print("Temp:");
-        }
-        lcd.setCursor(6, 1);
-        lcd.print(int(Temperature));
+  case 2:
+    if (menu == 0) {
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Cool to");
+        lcd.setCursor(0, 1);
+        lcd.print("Temp");
       }
-      thermostat();
+      lcd.setCursor(6, 1);
+      lcd.print(int(Temperature));
+      lcd.setCursor(9, 0);
+      lcd.print(int(StarterHoldTemp));
+    }
+    Temperature = measuretemp();
+    if (int(Temperature) <= int(StarterHoldTemp)){
+      YogStep++;
+      lcd.clear();
+      ClassicSetPoint = StarterHoldTemp;
+      newdisplay = true;
+    }
+    break;
+
+  case 3:
+    if (menu == 0) {
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Add starter");
+        lcd.setCursor(0, 1);
+        lcd.print("Temp");
+      }
+      lcd.setCursor(6, 1);
+      lcd.print(int(Temperature));
       if (shortButtonPressed || longButtonPressed){
         shortButtonPressed = false;
         longButtonPressed = false;
@@ -386,64 +388,69 @@ void yogurt(){
         ClassicSetPoint = IncubTemp;
         IncubStartTime = millis();
         newdisplay = true;
+      }        
+    }
+    thermostat();
+    break;
+
+  case 4:
+    if (menu == 0) {
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Incub   /  sec");
+//        lcd.print("Incub   /  h");
+        lcd.setCursor(9, 0); 
+        lcd.print(int(IncubDuration));            
+//        lcd.print(int(IncubDuration/3600));    
+        lcd.setCursor(0, 1);
+        lcd.print("Temp");
       }
-      break;
-      
-    case 4:
-      if (menu == 0) {
-        if (newdisplay){
-          newdisplay = false;
-          lcd.setCursor(0, 0);
-          lcd.print("Incub:  /  h");
-          lcd.setCursor(9, 0); 
-          lcd.print(int(IncubDuration/3600));         
-          lcd.setCursor(0, 1);
-          lcd.print("Temp:");
-        }
-        lcd.setCursor(6, 0); 
-        lcd.print(int((millis()-IncubStartTime)/1000/3600));
-        lcd.setCursor(6, 1);
-        lcd.print(int(Temperature));
+      lcd.setCursor(6, 0); 
+      lcd.print(int((millis()-IncubStartTime)/1000));
+//      lcd.print(int((millis()-IncubStartTime)/1000/3600));      
+      lcd.setCursor(6, 1);
+      lcd.print(int(Temperature));
+    }
+    thermostat();
+    if (millis() - IncubStartTime > 1000*IncubDuration){
+      YogStep++;
+      lcd.clear();
+      digitalWrite(relayPin, LOW); 
+      newdisplay = true;
+    }
+    break;
+
+  case 5:
+    if (menu == 0) {
+      if (newdisplay){
+        newdisplay = false;
+        lcd.setCursor(0, 0);
+        lcd.print("Ready");
+        lcd.setCursor(0, 1);
+        lcd.print("Temp");
       }
-      thermostat();
-      if (millis() > IncubStartTime + 1000*IncubDuration){
-        YogStep++;
-        lcd.clear();
-        digitalWrite(relayPin, LOW); 
-        newdisplay = true;
-      }
-      break;
-      
-    case 5:
-      if (menu == 0) {
-        if (newdisplay){
-          newdisplay = false;
-          lcd.setCursor(0, 0);
-          lcd.print("Ready!");
-          lcd.setCursor(0, 1);
-          lcd.print("Temp:");
-        }
-        lcd.setCursor(6, 1);
-        lcd.print(int(Temperature));
-      }
-      break;      
+      lcd.setCursor(6, 1);
+      lcd.print(int(Temperature));
+    }
+    break;      
   }
 }
 
 double acquiresettemp(){
   return map(analogRead(potPin), 0, 1023, 99, 15); 
 }
-  
+
 double measuretemp(){
   uint8_t i;
   float average;
   for (i=0; i< numsamp; i++) {
-   samples[i] = analogRead(thermPin);
-   delay(10);
+    samples[i] = analogRead(thermPin);
+    delay(10);
   }
   average = 0;
   for (i=0; i< numsamp; i++) {
-     average += samples[i];
+    average += samples[i];
   }
   average /= numsamp;
   average = 1023 / average - 1;
@@ -457,3 +464,4 @@ double measuretemp(){
   steinhart -= 273.15;                         // convert to C
   return steinhart;
 }
+
