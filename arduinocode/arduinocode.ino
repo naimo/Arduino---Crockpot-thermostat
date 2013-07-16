@@ -91,23 +91,6 @@ void thermostat(){
   }
 }
 
-void basicthermostat(){
-  thermostat();
-  if (menu == 0) {
-    if (newdisplay){
-      newdisplay = false;
-      lcd.setCursor(0, 0);
-      lcd.print("Set:");
-      lcd.setCursor(0, 1);
-      lcd.print("Real:");
-    }
-    lcd.setCursor(6, 1);
-    lcd.print(int(Temperature));
-    lcd.setCursor(5, 0);
-    lcd.print(int(ClassicSetPoint));
-  }
-}
-
 double acquiresettemp(){
   return map(analogRead(potPin), 0, 1023, 99, 15); 
 }
@@ -149,6 +132,23 @@ void button(){
     } 
     lastButtonState = buttonState;
     lastButtonTime = millis();
+  }
+}
+
+void basicthermostat(){
+  thermostat();
+  if (menu == 0) {
+    if (newdisplay){
+      newdisplay = false;
+      lcd.setCursor(0, 0);
+      lcd.print("Set:");
+      lcd.setCursor(0, 1);
+      lcd.print("Real:");
+    }
+    lcd.setCursor(6, 1);
+    lcd.print(int(Temperature));
+    lcd.setCursor(5, 0);
+    lcd.print(int(ClassicSetPoint));
   }
 }
 
