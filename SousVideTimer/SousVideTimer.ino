@@ -45,7 +45,9 @@ double Setpoint;
 double Input;
 double Output;
 double Time;
+double Minutes;
 long StartTime;
+boolean TimerOn = false;
 
 volatile long onTime = 0;
 
@@ -91,7 +93,7 @@ long lastLogTime = 0;
 // ************************************************
 // States for state machine
 // ************************************************
-enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO};
+enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO, DONE};
 operatingState opState = OFF;
 
 // Button handling
@@ -136,7 +138,6 @@ void setup()
   
    // Initialize the PID and related variables
    LoadParameters();
-   StartTime=millis();
    myPID.SetTunings(Kp,Ki,Kd);
 
    myPID.SetSampleTime(1000);
@@ -198,6 +199,12 @@ void loop()
    case TUNE_D:
       TuneD();
       break;
+   case AUTO:
+   Auto();
+      break;
+   case DONE:
+      Done();
+      break;      
    }
 }
 
@@ -252,6 +259,31 @@ void Off()
    opState = RUN; // start control
 }
 
+void Done()
+{
+   myPID.SetMode(MANUAL);
+   digitalWrite(RelayPin, LOW);  // make sure it is off
+   lcd.setCursor(2, 0);
+   lcd.print(F("Cooking Done"));
+   
+   while(!(shortButtonPressed || longButtonPressed))
+   {
+     Input = measuretemp();
+     lcd.setCursor(4,1);
+     lcd.print(int(Input/10) % 10);
+     lcd.print(int(Input) % 10);
+     lcd.print(F("."));
+     lcd.print(int(Input*10) % 10);
+     lcd.print(F(" C"));
+     button();
+   }
+   
+   //turn the PID on
+   myPID.SetMode(AUTOMATIC);
+   windowStartTime = millis();
+   opState = RUN; // start control
+}
+
 // ************************************************
 // Setpoint Entry State
 // Potentiometer to change setpoint
@@ -281,7 +313,7 @@ void Tune_Sp()
          return;
       }
 
-      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
       {
          opState = RUN;
          change=false;
@@ -307,7 +339,7 @@ void Tune_T()
    {
       button();
       if (change){
-        Time = map(analogRead(PotPin), 0, 1023, 0, 1440);
+        Time = 2*floor(map(analogRead(PotPin), 0, 1023, 0, 1440)/2);
         StartTime=millis();
         lcd.setCursor(15, 1);
         lcd.print("#");
@@ -324,26 +356,18 @@ void Tune_T()
          return;
       }
 
-      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
       {
          opState = RUN;
          change=false;
          return;
       }
-
-     if (Time == 0)
-       {
      lcd.setCursor(0,1);
-     lcd.print(F("Timer OFF"));         
-       }else{
-     lcd.setCursor(0,1);
-     lcd.print(F("         "));
      lcd.print(int(Time/1000) % 10);
      lcd.print(int(Time/100) % 10);
      lcd.print(int(Time/10) % 10);
      lcd.print(int(Time/1) % 10);   
      lcd.print(F("min"));
-       }
    }
 }
 
@@ -375,7 +399,7 @@ void TuneP()
          change=false;
          return;
       }
-      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
       {
          opState = RUN;
          change=false;
@@ -418,7 +442,7 @@ void TuneI()
          change=false;
          return;
       }
-      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
       {
          opState = RUN;
          change=false;
@@ -456,11 +480,11 @@ void TuneD()
       }
       if (shortButtonPressed)
       {
-         opState = RUN;
+         opState = AUTO;
          change=false;
          return;
       }
-      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
       {
          opState = RUN;
          change=false;
@@ -469,6 +493,48 @@ void TuneD()
       lcd.setCursor(0,1);
       lcd.print(Kd);
       lcd.print(" ");
+      DoControl();
+   }
+}
+
+// ************************************************
+// Derivative Tuning State
+// Potentiometer to change Kd
+// Short for RUN
+// Long for changing value
+// ************************************************
+void Auto()
+{
+   lcd.print(F("Autotune"));
+   while(true)
+   {
+      button();  
+      if (longButtonPressed)
+      {
+         if(!tuning && abs(Input - Setpoint) < 1){
+           StartAutoTune();
+           opState = RUN;
+           TimerOn=false;
+         }
+         return;
+      }
+      if (shortButtonPressed)
+      {
+         opState = RUN;
+         return;
+      }
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      {
+         opState = RUN;
+         change=false;
+         return;
+      }
+      lcd.setCursor(0,1);
+      if(tuning){
+      lcd.print("On");
+      }else{
+      lcd.print("Off");
+      }  
       DoControl();
    }
 }
@@ -485,18 +551,13 @@ void Run()
    lcd.print(int(Setpoint) % 10);
    lcd.print(F("C"));
 
-     if (Time == 0)
-       {
-     lcd.setCursor(0,1);
-     lcd.print(F("Timer OFF"));         
-       }else{
-     lcd.setCursor(0,1);
-     lcd.print(int(Time/1000) % 10);
-     lcd.print(int(Time/100) % 10);
-     lcd.print(int(Time/10) % 10);
-     lcd.print(int(Time/1) % 10);   
-     lcd.print(F(" min"));
-       }
+   lcd.setCursor(8,1);
+   lcd.print(F("/"));   
+   lcd.print(int(Time/1000) % 10);
+   lcd.print(int(Time/100) % 10);
+   lcd.print(int(Time/10) % 10);
+   lcd.print(int(Time/1) % 10);   
+   lcd.print(F("min"));
 
    SaveParameters();
    myPID.SetTunings(Kp,Ki,Kd);
@@ -508,12 +569,13 @@ void Run()
            opState = SETP;
            return;
       }
-      else if (longButtonPressed && (abs(Input - Setpoint) < 0.5))  // Should be at steady-state
+      if (longButtonPressed)
       {
-         StartAutoTune();
+         TimerOn=!TimerOn;
+         if(TimerOn){StartTime=millis();}
          return;
       }
-    
+
       DoControl();
       
       lcd.setCursor(0,0);
@@ -524,11 +586,29 @@ void Run()
       lcd.print(F("/"));
       
       float pct = map(Output, 0, WindowSize, 0, 100);
-      lcd.setCursor(12,0);
+      lcd.setCursor(10,0);
       lcd.print(int(pct/100) % 10);
       lcd.print(int(pct/10) % 10);
       lcd.print(int(pct) % 10);
       lcd.print(F("%"));
+
+      if(TimerOn){
+        Minutes=(millis()-StartTime)/60000;
+        if(Minutes>=Time)
+        {
+          opState = DONE;
+          TimerOn=false;
+          return;
+        }
+        lcd.setCursor(4,1);      
+        lcd.print(int(Minutes/1000) % 10);
+        lcd.print(int(Minutes/100) % 10);
+        lcd.print(int(Minutes/10) % 10);
+        lcd.print(int(Minutes/1) % 10);
+      } else {
+        lcd.setCursor(0,1);
+        lcd.print(F("TimerOff"));
+      }
 
       lcd.setCursor(15,0);
       if (tuning)
@@ -547,6 +627,7 @@ void DoControl()
 {
   // Read the input:
   Input = measuretemp();
+  Minutes=(millis()-StartTime)/60000;
 
   if (tuning) // run the auto-tuner
   {
@@ -557,7 +638,7 @@ void DoControl()
   }
   else // Execute control algorithm
   {
-     myPID.Compute();
+    myPID.Compute();
   }
   
   // Time Proportional relay state is updated regularly via Timer interrupt.
