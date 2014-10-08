@@ -243,14 +243,19 @@ void Off()
 {
    myPID.SetMode(MANUAL);
    digitalWrite(RelayPin, LOW);  // make sure it is off
-   lcd.setCursor(3, 0);
-   lcd.print(F("Sous Vide"));
-   lcd.setCursor(6, 1);
-   lcd.print(F("OFF"));
+   lcd.setCursor(1, 0);
+   lcd.print(F("Sous Vide Off"));
    
    while(!(shortButtonPressed || longButtonPressed))
    {
-      button();
+     Input = measuretemp();
+     lcd.setCursor(4,1);
+     lcd.print(int(Input/10) % 10);
+     lcd.print(int(Input) % 10);
+     lcd.print(F("."));
+     lcd.print(int(Input*10) % 10);
+     lcd.print(F(" C"));
+     button();
    }
    
    //turn the PID on
@@ -363,9 +368,21 @@ void Tune_T()
          return;
       }
      lcd.setCursor(0,1);
-     lcd.print(int(Time/1000) % 10);
-     lcd.print(int(Time/100) % 10);
-     lcd.print(int(Time/10) % 10);
+     if(int(Time/1000)>0){
+       lcd.print(int(Time/1000) % 10);
+     }else{
+       lcd.print(F(" "));
+     }
+     if(int(Time/100)>0){
+       lcd.print(int(Time/100) % 10);
+     }else{
+       lcd.print(F(" "));
+     }
+     if(int(Time/10)>0){
+       lcd.print(int(Time/10) % 10);
+     }else{
+       lcd.print(F(" "));
+     }
      lcd.print(int(Time/1) % 10);   
      lcd.print(F("min"));
    }
@@ -553,9 +570,15 @@ void Run()
 
    lcd.setCursor(8,1);
    lcd.print(F("/"));   
-   lcd.print(int(Time/1000) % 10);
-   lcd.print(int(Time/100) % 10);
-   lcd.print(int(Time/10) % 10);
+   if(int(Time/1000)>0){
+     lcd.print(int(Time/1000) % 10);
+   }
+   if(int(Time/100)>0){
+     lcd.print(int(Time/100) % 10);
+   }
+   if(int(Time/10)>0){
+     lcd.print(int(Time/10) % 10);
+   }
    lcd.print(int(Time/1) % 10);   
    lcd.print(F("min"));
 
@@ -600,11 +623,20 @@ void Run()
           TimerOn=false;
           return;
         }
-        lcd.setCursor(4,1);      
-        lcd.print(int(Minutes/1000) % 10);
-        lcd.print(int(Minutes/100) % 10);
-        lcd.print(int(Minutes/10) % 10);
-        lcd.print(int(Minutes/1) % 10);
+        if(int(Minutes/1000)>0){
+          lcd.setCursor(4,1);
+          lcd.print(int(Minutes/1000) % 10);
+        }
+        if(int(Minutes/100)>0){
+          lcd.setCursor(5,1);
+          lcd.print(int(Minutes/100) % 10);
+        }
+        if(int(Minutes/10)>0){
+          lcd.setCursor(6,1);
+          lcd.print(int(Minutes/10) % 10);
+        }
+        lcd.setCursor(7,1);
+        lcd.print(int(Minutes) % 10);
       } else {
         lcd.setCursor(0,1);
         lcd.print(F("TimerOff"));
