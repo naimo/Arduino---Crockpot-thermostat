@@ -44,7 +44,7 @@
 double Setpoint;
 double Input;
 double Output;
-double Time=720;
+double Time;
 double TimeLeft;
 
 volatile long onTime = 0;
@@ -580,6 +580,10 @@ void SaveParameters()
    {
       EEPROM_writeDouble(KdAddress, Kd);
    }
+   if (Time != EEPROM_readDouble(TimeAddress))
+   {
+      EEPROM_writeDouble(TimeAddress, Time);
+   }
 }
 
 // ************************************************
@@ -592,6 +596,7 @@ void LoadParameters()
    Kp = EEPROM_readDouble(KpAddress);
    Ki = EEPROM_readDouble(KiAddress);
    Kd = EEPROM_readDouble(KdAddress);
+   Time = EEPROM_readDouble(TimeAddress);
    
    // Use defaults if EEPROM values are invalid
    if (isnan(Setpoint))
@@ -609,6 +614,10 @@ void LoadParameters()
    if (isnan(Kd))
    {
      Kd = 0.1;
+   }  
+   if (isnan(Time))
+   {
+     Time = 720;
    }  
 }
 
