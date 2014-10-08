@@ -12,6 +12,8 @@
 // PID Library
 #include <PID_v1.h>
 #include <PID_AutoTune_v0.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // So we can save and retrieve settings
 #include <EEPROM.h>
@@ -24,19 +26,15 @@
 // ************************************************
 
 // Output Relay
-#define RelayPin 6
-
-// Input Thermistor
-#define ThermPin A1
+#define RelayPin 9
 
 // Button
-#define PushPin 10
+#define PushPin 8
 
 // Potentiometer
-#define PotPin A2
+#define PotPin A0
 
-// Thermistor variable
-#define NUMSAMPLES 5
+#define ONE_WIRE_BUS 12
 
 // ************************************************
 // PID Variables and constants
@@ -46,6 +44,8 @@
 double Setpoint;
 double Input;
 double Output;
+double Time=720;
+double TimeLeft;
 
 volatile long onTime = 0;
 
@@ -59,6 +59,7 @@ const int SpAddress = 0;
 const int KpAddress = 8;
 const int KiAddress = 16;
 const int KdAddress = 24;
+const int TimeAddress = 32;
 
 //Specify the links and initial tuning parameters
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
@@ -95,37 +96,40 @@ operatingState opState = OFF;
 
 // Button handling
 int buttonState;
-int lastButtonState = LOW;
+int lastButtonState = HIGH;
 long lastButtonTime = 0;
 long longPressTime = 500;
 boolean shortButtonPressed = false;
 boolean longButtonPressed = false;
+
 boolean change = false;
 long timeout = 10000;
 
-// thermistor setup
-int nominalR = 10000;
-int nominalT = 25;
-int numsamp = NUMSAMPLES;
-int bcoeff = 3950;
-int seriesR = 10000;
-int samples[NUMSAMPLES];
+LiquidCrystal lcd(11, 10, 5, 4, 3, 2);
 
-LiquidCrystal lcd(12, 11, 1, 2, 3, 4);
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+
+// Pass our oneWire reference to Dallas Temperature. 
+DallasTemperature sensors(&oneWire);
 
 // ************************************************
+
 // Setup and diSplay initial screen
 // ************************************************
 void setup()
 {
-   // Initialize Relay Control:
+   //sensors.begin();
+  // Initialize Relay Control:
    pinMode(RelayPin, OUTPUT);    // Output mode to drive relay
    digitalWrite(RelayPin, LOW);  // make sure it is off to start
 
+   pinMode(PushPin, INPUT_PULLUP);
+   
    // Initialize LCD DiSplay 
 
    lcd.begin(16, 2);
-   lcd.print(F("    Naimo"));
+   lcd.print(F("    Wuhbet"));
    lcd.setCursor(0, 1);
    lcd.print(F("   Sous Vide!"));
    delay(3000);
@@ -137,7 +141,7 @@ void setup()
    myPID.SetSampleTime(1000);
    myPID.SetOutputLimits(0, WindowSize);
 
-  // Run timer2 interrupt every 15 ms 
+  // Run Timer2 interrupt every 15 ms 
   TCCR2A = 0;
   TCCR2B = 1<<CS22 | 1<<CS21 | 1<<CS20;
 
@@ -193,6 +197,34 @@ void loop()
    }
 }
 
+// read temperature
+double measuretemp(){
+  sensors.requestTemperatures();
+  return sensors.getTempCByIndex(0);
+}
+
+// capture button presses
+void button(){
+  buttonState = digitalRead(PushPin);
+  if (buttonState != lastButtonState) {
+    if (buttonState == HIGH) {
+      if (millis()-lastButtonTime < longPressTime){
+        shortButtonPressed = true;
+      }
+      else{
+        longButtonPressed = true;
+      }
+    } 
+    lastButtonState = buttonState;
+    lastButtonTime = millis();
+  }
+}
+
+void resetbutton(){
+  shortButtonPressed=false;
+  longButtonPressed=false;
+}
+
 // ************************************************
 // Initial State - long or short button to enter setpoint
 // ************************************************
@@ -219,7 +251,7 @@ void Off()
 // ************************************************
 // Setpoint Entry State
 // Potentiometer to change setpoint
-// Short for tuning parameters
+// Short for Time
 // Long for changing value
 // ************************************************
 void Tune_Sp()
@@ -229,7 +261,7 @@ void Tune_Sp()
    {
       button();
       if (change){
-        Setpoint = map(analogRead(PotPin), 0, 1023, 99, 15);
+        Setpoint = map(analogRead(PotPin), 0, 1023, 15, 99);
         lcd.setCursor(15, 1);
         lcd.print("#");
       };        
@@ -252,9 +284,9 @@ void Tune_Sp()
          return;
       }
       lcd.setCursor(0,1);
-      lcd.print(Setpoint);
-      lcd.print(" ");
-      DoControl();
+      lcd.print(int(Setpoint/10) % 10);
+      lcd.print(int(Setpoint) % 10);
+      lcd.print(F("C"));
    }
 }
 
@@ -271,7 +303,7 @@ void TuneP()
    {
       button();
       if (change){
-        Kp = map(analogRead(PotPin), 0, 1023, 1000, 500);
+        Kp = map(analogRead(PotPin), 0, 1023, 100, 2000);
         lcd.setCursor(15, 1);
         lcd.print("#");
       };        
@@ -314,7 +346,7 @@ void TuneI()
       button();
 
       if (change){
-        Ki = map(analogRead(PotPin), 0, 1023, 1000, 100)/1000.0;
+        Ki = map(analogRead(PotPin), 0, 1023, 100, 1000)/1000.0;
         lcd.setCursor(15, 1);
         lcd.print("#");
       };        
@@ -356,7 +388,7 @@ void TuneD()
       button();
 
       if (change){
-        Kd = map(analogRead(PotPin), 0, 1023, 200, 50)/1000.0;
+        Kd = map(analogRead(PotPin), 0, 1023, 50, 200)/1000.0;
         lcd.setCursor(15, 1);
         lcd.print("#");
       };        
@@ -391,10 +423,17 @@ void TuneD()
 // ************************************************
 void Run()
 {
-   // set up the LCD's number of rows and columns: 
-   lcd.print(F("Sp: "));
-   lcd.print(Setpoint);
-   lcd.print(F("C : "));
+   lcd.setCursor(5,0);
+   lcd.print(int(Setpoint/10) % 10);
+   lcd.print(int(Setpoint) % 10);
+   lcd.print(F("C"));
+
+   lcd.setCursor(0,1);
+   lcd.print(int(Time/1000) % 10);
+   lcd.print(int(Time/100) % 10);
+   lcd.print(int(Time/10) % 10);
+   lcd.print(int(Time/1) % 10);   
+   lcd.print(F("min"));
 
    SaveParameters();
    myPID.SetTunings(Kp,Ki,Kd);
@@ -403,96 +442,39 @@ void Run()
       button();
       if (shortButtonPressed)
       {
-//         StartAutoTune();
            opState = SETP;
            return;
       }
       else if (longButtonPressed && (abs(Input - Setpoint) < 0.5))  // Should be at steady-state
       {
          StartAutoTune();
-         resetbutton();
+         return;
       }
     
       DoControl();
       
-      lcd.setCursor(0,1);
-      lcd.print(Input);
-      lcd.print(F("C : "));
+      lcd.setCursor(0,0);
+      lcd.print(int(Input/10) % 10);
+      lcd.print(int(Input) % 10);
+      lcd.print(F("."));
+      lcd.print(int(Input*10) % 10);
+      lcd.print(F("/"));
       
-      float pct = map(Output, 0, WindowSize, 0, 1000);
-      lcd.setCursor(10,1);
-      lcd.print(F("      "));
-      lcd.setCursor(10,1);
-      lcd.print(pct/10);
-      lcd.print("%");
+      float pct = map(Output, 0, WindowSize, 0, 100);
+      lcd.setCursor(12,0);
+      lcd.print(int(pct/100) % 10);
+      lcd.print(int(pct/10) % 10);
+      lcd.print(int(pct) % 10);
+      lcd.print(F("%"));
 
       lcd.setCursor(15,0);
       if (tuning)
       {
         lcd.print("T");
       }
-      else
-      {
-        lcd.print(" ");
-      }
       
       delay(100);
    }
-}
-
-
-// ************************************************
-// Read temperature
-// ************************************************
-double measuretemp(){
-  uint8_t i;
-  float average;
-  for (i=0; i< numsamp; i++) {
-    samples[i] = analogRead(ThermPin);
-    delay(10);
-  }
-  average = 0;
-  for (i=0; i< numsamp; i++) {
-    average += samples[i];
-  }
-  average /= numsamp;
-  average = 1023 / average - 1;
-  average = seriesR / average;
-  float steinhart;
-  steinhart = average / nominalR;     // (R/Ro)
-  steinhart = log(steinhart);                  // ln(R/Ro)
-  steinhart /= bcoeff;                   // 1/B * ln(R/Ro)
-  steinhart += 1.0 / (nominalT + 273.15); // + (1/To)
-  steinhart = 1.0 / steinhart;                 // Invert
-  steinhart -= 273.15;                         // convert to C
-  return steinhart;
-}
-
-// ************************************************
-// Detect long and short button presses
-// ************************************************
-void button(){
-  buttonState = digitalRead(PushPin);
-  if (buttonState != lastButtonState) {
-    if (buttonState == LOW) {
-      if (millis()-lastButtonTime < longPressTime){
-        shortButtonPressed = true;
-      }
-      else{
-        longButtonPressed = true;
-      }
-    } 
-    lastButtonState = buttonState;
-    lastButtonTime = millis();
-  }
-}
-
-// ************************************************
-// Cleans button presses after action is taken
-// ************************************************
-void resetbutton(){
-  shortButtonPressed=false;
-  longButtonPressed=false;
 }
 
 // ************************************************
@@ -515,7 +497,7 @@ void DoControl()
      myPID.Compute();
   }
   
-  // Time Proportional relay state is updated regularly via timer interrupt.
+  // Time Proportional relay state is updated regularly via Timer interrupt.
   onTime = Output; 
 }
 
