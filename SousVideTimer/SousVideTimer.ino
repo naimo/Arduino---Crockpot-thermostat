@@ -45,7 +45,7 @@ double Setpoint;
 double Input;
 double Output;
 double Time;
-double TimeLeft;
+long StartTime;
 
 volatile long onTime = 0;
 
@@ -91,7 +91,7 @@ long lastLogTime = 0;
 // ************************************************
 // States for state machine
 // ************************************************
-enum operatingState { OFF = 0, SETP, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO};
+enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO};
 operatingState opState = OFF;
 
 // Button handling
@@ -136,6 +136,7 @@ void setup()
   
    // Initialize the PID and related variables
    LoadParameters();
+   StartTime=millis();
    myPID.SetTunings(Kp,Ki,Kd);
 
    myPID.SetSampleTime(1000);
@@ -182,7 +183,10 @@ void loop()
    case SETP:
       Tune_Sp();
       break;
-    case RUN:
+   case SETT:
+      Tune_T();
+      break;
+   case RUN:
       Run();
       break;
    case TUNE_P:
@@ -272,7 +276,7 @@ void Tune_Sp()
       }
       if (shortButtonPressed)
       {
-         opState = TUNE_P;
+         opState = SETT;
          change=false;
          return;
       }
@@ -287,6 +291,59 @@ void Tune_Sp()
       lcd.print(int(Setpoint/10) % 10);
       lcd.print(int(Setpoint) % 10);
       lcd.print(F("C"));
+   }
+}
+
+// ************************************************
+// Time Entry State
+// Potentiometer to change Time
+// Short for PID params
+// Long for changing value
+// ************************************************
+void Tune_T()
+{
+   lcd.print(F("Set Time:"));
+   while(true)
+   {
+      button();
+      if (change){
+        Time = map(analogRead(PotPin), 0, 1023, 0, 1440);
+        StartTime=millis();
+        lcd.setCursor(15, 1);
+        lcd.print("#");
+      };        
+      if (longButtonPressed)
+      {
+         change = !change;
+         return;
+      }
+      if (shortButtonPressed)
+      {
+         opState = TUNE_P;
+         change=false;
+         return;
+      }
+
+      if ((millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      {
+         opState = RUN;
+         change=false;
+         return;
+      }
+
+     if (Time == 0)
+       {
+     lcd.setCursor(0,1);
+     lcd.print(F("Timer OFF"));         
+       }else{
+     lcd.setCursor(0,1);
+     lcd.print(F("         "));
+     lcd.print(int(Time/1000) % 10);
+     lcd.print(int(Time/100) % 10);
+     lcd.print(int(Time/10) % 10);
+     lcd.print(int(Time/1) % 10);   
+     lcd.print(F("min"));
+       }
    }
 }
 
@@ -428,12 +485,18 @@ void Run()
    lcd.print(int(Setpoint) % 10);
    lcd.print(F("C"));
 
-   lcd.setCursor(0,1);
-   lcd.print(int(Time/1000) % 10);
-   lcd.print(int(Time/100) % 10);
-   lcd.print(int(Time/10) % 10);
-   lcd.print(int(Time/1) % 10);   
-   lcd.print(F("min"));
+     if (Time == 0)
+       {
+     lcd.setCursor(0,1);
+     lcd.print(F("Timer OFF"));         
+       }else{
+     lcd.setCursor(0,1);
+     lcd.print(int(Time/1000) % 10);
+     lcd.print(int(Time/100) % 10);
+     lcd.print(int(Time/10) % 10);
+     lcd.print(int(Time/1) % 10);   
+     lcd.print(F(" min"));
+       }
 
    SaveParameters();
    myPID.SetTunings(Kp,Ki,Kd);
