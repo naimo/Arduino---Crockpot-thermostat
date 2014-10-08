@@ -243,10 +243,10 @@ void Off()
 {
    myPID.SetMode(MANUAL);
    digitalWrite(RelayPin, LOW);  // make sure it is off
-   lcd.setCursor(0, 0);
-   lcd.print(F("   Sous Vide"));
-   lcd.setCursor(0, 1);
-   lcd.print(F("   OFF"));
+   lcd.setCursor(3, 0);
+   lcd.print(F("Sous Vide"));
+   lcd.setCursor(6, 1);
+   lcd.print(F("OFF"));
    
    while(!(shortButtonPressed || longButtonPressed))
    {
@@ -339,7 +339,7 @@ void Tune_T()
    {
       button();
       if (change){
-        Time = 2*floor(map(analogRead(PotPin), 0, 1023, 0, 1440)/2);
+        Time = 2*floor(map(analogRead(PotPin), 0, 1023, 2, 1440)/2);
         StartTime=millis();
         lcd.setCursor(15, 1);
         lcd.print("#");
