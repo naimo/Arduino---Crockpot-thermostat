@@ -156,7 +156,7 @@ void setup()
 // ************************************************
 SIGNAL(TIMER2_OVF_vect) 
 {
-  if (opState == OFF)
+  if (opState == OFF || opState == DONE)
   {
     digitalWrite(RelayPin, LOW);  // make sure relay is off
   }
