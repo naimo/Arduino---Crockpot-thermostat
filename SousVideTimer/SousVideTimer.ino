@@ -46,7 +46,7 @@ double Input;
 double Output;
 double Time;
 double Minutes;
-long StartTime;
+unsigned long StartTime;
 boolean TimerOn = false;
 
 volatile long onTime = 0;
@@ -84,13 +84,6 @@ boolean tuning = false;
 PID_ATune aTune(&Input, &Output);
 
 // ************************************************
-// DiSplay Variables and constants
-// ************************************************
-
-const int logInterval = 10000; // log every 10 seconds
-long lastLogTime = 0;
-
-// ************************************************
 // States for state machine
 // ************************************************
 enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO, DONE};
@@ -99,8 +92,8 @@ operatingState opState = OFF;
 // Button handling
 int buttonState;
 int lastButtonState = HIGH;
-long lastButtonTime = 0;
-long longPressTime = 500;
+unsigned long lastButtonTime = 0;
+unsigned long longPressTime = 500;
 boolean shortButtonPressed = false;
 boolean longButtonPressed = false;
 
