@@ -86,7 +86,7 @@ PID_ATune aTune(&Input, &Output);
 // ************************************************
 // States for state machine
 // ************************************************
-enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO, DONE};
+enum operatingState { OFF = 0, SETP, SETT, RUN, TUNE_P, TUNE_I, TUNE_D, AUTO, DONE, ADV};
 operatingState opState = OFF;
 
 // Button handling
@@ -183,6 +183,9 @@ void loop()
    case RUN:
       Run();
       break;
+   case ADV:
+      Advanced();
+      break;   
    case TUNE_P:
       TuneP();
       break;
@@ -282,12 +285,6 @@ void Done()
    opState = RUN; // start control
 }
 
-// ************************************************
-// Setpoint Entry State
-// Potentiometer to change setpoint
-// Short for Time
-// Long for changing value
-// ************************************************
 void Tune_Sp()
 {
    lcd.print(F("Set Temperature:"));
@@ -324,12 +321,6 @@ void Tune_Sp()
    }
 }
 
-// ************************************************
-// Time Entry State
-// Potentiometer to change Time
-// Short for PID params
-// Long for changing value
-// ************************************************
 void Tune_T()
 {
    lcd.print(F("Set Time:"));
@@ -349,7 +340,7 @@ void Tune_T()
       }
       if (shortButtonPressed)
       {
-         opState = TUNE_P;
+         opState = ADV;
          change=false;
          return;
       }
@@ -381,12 +372,35 @@ void Tune_T()
    }
 }
 
-// ************************************************
-// Proportional Tuning State
-// Potentiometer to change Kp
-// Short for Ki
-// Long for changing value
-// ************************************************
+void Advanced()
+{
+   lcd.print(F("Advanced PID"));
+   lcd.setCursor(0,1);
+   lcd.print(F(">> Long press"));
+   while(true)
+   {
+      button();  
+      if (longButtonPressed)
+      {
+         opState = TUNE_P;
+         return;
+      }
+      if (shortButtonPressed)
+      {
+         opState = RUN;
+         return;
+      }
+      if (!change & (millis() - lastButtonTime) > timeout)  // return to RUN after 3 seconds idle
+      {
+         opState = RUN;
+         change=false;
+         return;
+      }
+      DoControl();
+   }
+}
+
+
 void TuneP()
 {
    lcd.print(F("Set Kp"));
@@ -422,13 +436,6 @@ void TuneP()
    }
 }
 
-
-// ************************************************
-// Integral Tuning State
-// Potentiometer to change Ki
-// Short for Kd
-// Long for changing value
-// ************************************************
 void TuneI()
 {
    lcd.print(F("Set Ki"));
@@ -465,12 +472,7 @@ void TuneI()
    }
 }
 
-// ************************************************
-// Derivative Tuning State
-// Potentiometer to change Kd
-// Short for RUN
-// Long for changing value
-// ************************************************
+
 void TuneD()
 {
    lcd.print(F("Set Kd"));
@@ -507,12 +509,7 @@ void TuneD()
    }
 }
 
-// ************************************************
-// Derivative Tuning State
-// Potentiometer to change Kd
-// Short for RUN
-// Long for changing value
-// ************************************************
+
 void Auto()
 {
    lcd.print(F("Autotune"));
